@@ -2,6 +2,10 @@ package com.nikkoaiello.mobile.android;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.DrawFilter;
+import android.graphics.Paint;
+import android.graphics.PaintFlagsDrawFilter;
+import android.graphics.Picture;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -46,6 +50,8 @@ public class PinchWebView extends WebView {
 	
 	private long mLastGestureTime;
 	private boolean mDragging = false;
+	private static final DrawFilter sZoomFilter = new PaintFlagsDrawFilter(Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG | Paint.SUBPIXEL_TEXT_FLAG, Paint.LINEAR_TEXT_FLAG);
+	private Picture mPicture = null;
 	//private Paint mPaint;
 	
 	public PinchWebView(Context context, AttributeSet attrs) {
@@ -119,20 +125,20 @@ public class PinchWebView extends WebView {
 					dist_delta = dist_curr - dist_pre;
 		    		
 			    	long now = android.os.SystemClock.uptimeMillis();
-			    	if (/*now - mLastGestureTime > 100 && */Math.abs(dist_delta) > mTouchSlop) {
+			    	if (now - mLastGestureTime > 100 && Math.abs(dist_delta) > mTouchSlop) {
 			    		mLastGestureTime = 0;
 			    		
 			    		ScaleAnimation scale = null;
 		    			int mode = dist_delta > 0 ? GROW : (dist_curr == dist_pre ? 2 : SHRINK);
 			    		switch (mode) {
 			    		case GROW: // grow
-			    			if ((mScale + ZOOM_FACTOR) < mMaxScale) {
+			    			if (mScale < mMaxScale) {
 			    				mOldScale = mScale;
 			    				mScale += ZOOM_FACTOR;
 			    			}
 			    		break;
 			    		case SHRINK: // shrink
-			    			if ((mScale - ZOOM_FACTOR) > mMinScale) {
+			    			if (mScale > mMinScale) {
 			    				mOldScale = mScale;
 			    				mScale -= ZOOM_FACTOR;
 			    			}
@@ -142,22 +148,23 @@ public class PinchWebView extends WebView {
 			    		if (mode != 2) {
 			    			mOldWidth = mWidth;
 			    			mOldHeight = mHeight;
-				            mWidth = Math.round(mDefaultWidth * mScale);
-							mHeight = Math.round(mDefaultHeight * mScale);
+				            mWidth = Math.round(getWidth() * mScale);
+							mHeight = Math.round(getHeight() * mScale);
 							
 							Log.e("NEW WIDTH", mWidth + "");
 							
-							getLayoutParams().width = mWidth;
-							getLayoutParams().height = mHeight;
+							//getLayoutParams().width = mWidth;
+							//getLayoutParams().height = mHeight;
 							
-							measure(MeasureSpec.makeMeasureSpec(mWidth, MeasureSpec.UNSPECIFIED), 
-									MeasureSpec.makeMeasureSpec(mHeight, MeasureSpec.UNSPECIFIED));
-							layout(getLeft(), getTop(), mWidth + getLeft(), mHeight + getTop());
+							//measure(MeasureSpec.makeMeasureSpec(mWidth, MeasureSpec.UNSPECIFIED), 
+							//		MeasureSpec.makeMeasureSpec(mHeight, MeasureSpec.UNSPECIFIED));
+							//layout(getLeft(), getTop(), mWidth + getLeft(), mHeight + getTop());
 							
-							getParent().requestLayout();
+							//requestLayout();
 							//requestLayout();
 							//stopLoading();
-							//invalidate();
+							mPicture = capturePicture();
+							invalidate();
 							
 			    			AnimationSet set = new AnimationSet(true);
 			    			
@@ -265,30 +272,22 @@ public class PinchWebView extends WebView {
 	
 	protected void onDraw(Canvas canvas) {
 		//Log.e("ON DRAW", "DRAWING!");
-		//removeAllViews();
-		//Rect rect = new Rect();
-		//canvas.clipRect(canvas.getClipBounds().left, canvas.getClipBounds().top, canvas.getWidth() * mScale, canvas.getHeight() * mScale);
+
+		canvas.setDrawFilter(sZoomFilter);
+		canvas.scale(mScale, mScale);
+		canvas.translate(-getScrollX(), -getScrollY());
 		
-		//canvas.scale(x_scale, y_scale, canvas.getClipBounds().left, canvas.getClipBounds().top);
-		//canvas.clipRect(canvas.getClipBounds().left, canvas.getClipBounds().top, (int) (width * 1.5), height + getScrollY());
-		//canvas.setViewport(getRight(), getBottom());
-		//canvas.scale(x_scale, y_scale, (x1 + x1_pre) / 2, (y1 + y1_pre) / 2);
-		//clipRect(getLeft(), getTop(), width, height);
-		//canvas.translate(canvas.getClipBounds().exactCenterX(), canvas.getClipBounds().exactCenterY());
-		//canvas.translate((getRight() - width) >> 1, y1_pre - y1);
-		//canvas.save();
-		//canvas.getClipBounds().right = mWidth;
-		//canvas.getClipBounds().bottom = mHeight;
-		//canvas.clipRect(canvas.getClipBounds());
-		//canvas.scale(mScale, mScale, (x1 + x1_pre) / 2, (y1 + y1_pre) / 2);
-		//canvas.translate(-Math.max(mWidth, getScrollX()), y1_pre - y1);
-		//canvas.setViewport(mWidth, mHeight);
+		if (mPicture != null) {
+			canvas.save();
+			canvas.drawPicture(mPicture);
+			canvas.restore();
+			mPicture = null;
+		}
+		
 		super.onDraw(canvas);
 		
 		//canvas.setViewport(mWidth, mHeight);
 		//canvas.restore();
-		//layout(getLeft() - (int)(x_scale), getTop(), getRight(), getBottom() + (int)(y_scale));
-		//computeScroll();
 	}
 	
 	/**
