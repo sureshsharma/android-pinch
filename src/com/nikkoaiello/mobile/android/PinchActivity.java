@@ -37,6 +37,8 @@ public class PinchActivity extends Activity {
 			}
         }); 
         
+        
+        //startActivity(new Intent("android.intent.action.MAIN"));
     }
 
 }
