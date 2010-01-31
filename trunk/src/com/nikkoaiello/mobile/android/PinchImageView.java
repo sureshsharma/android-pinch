@@ -3,43 +3,45 @@ package com.nikkoaiello.mobile.android;
 import android.content.Context;
 import android.graphics.Paint;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.MotionEvent;
+import android.view.ViewConfiguration;
 import android.view.animation.ScaleAnimation;
 import android.widget.ImageView;
+import android.widget.Scroller;
 
 public class PinchImageView extends ImageView  {
 	
 	public static final int GROW = 0;
 	public static final int SHRINK = 1;
-	public static final int DURATION = 150;
+	
+	public static final int DURATION = 100;
+	public static final int TOUCH_INTERVAL = 100;
 	
 	public static final float MIN_SCALE = 0.5f;
-	public static final float MAX_SCALE = 2.5f;
-	public static final float ZOOM = 0.1f;
+	public static final float MAX_SCALE = 2.75f;
+	public static final float ZOOM = 0.25f;
 	
-	protected static float x1, 
-		x2, 
-		y1, 
-		y2, 
-		x1_pre,
-		y1_pre,
-		dist_delta = 0,
-		dist_curr = -1, 
-		dist_pre = -1,
-		x_scale = 1.0f,
-		y_scale = 1.0f;
-	private long mLastGestureTime;
-	private Paint mPaint;
+	private static int _interpolator = android.R.anim.accelerate_interpolator;
+	
+	float xCur, yCur, 
+		xPre, yPre,
+		xSec, ySec,
+		distDelta,
+		distCur, distPre,
+		xScale = 1.0f, yScale = 1.0f;
+	int mTouchSlop;
+	long mLastGestureTime;
+	Paint mPaint;
+	//Scroller mScroller;
 	
 	public PinchImageView(Context context,AttributeSet attr) {
          super(context,attr);
-         mPaint = new Paint();
-         mPaint.setAntiAlias(true);
+         _init();
     }
 	
 	public PinchImageView(Context context) {
         super(context);        
+        _init();
    }
 
 	public boolean onTouchEvent(MotionEvent event) {
@@ -48,34 +50,35 @@ public class PinchImageView extends ImageView  {
 	
 	    switch (action) {
 	    case MotionEvent.ACTION_MOVE:
-	    	int interpolator = android.R.anim.accelerate_interpolator;
 	    	
 	    	// point 1 coords
-    		x1 = event.getX(0);
-    		y1 = event.getY(0);
+    		xCur = event.getX(0);
+    		yCur = event.getY(0);
     		
 	    	if (p_count > 1) {
 	    		// point 2 coords
-	    		x2 = event.getX(1);
-	    		y2 = event.getY(1);
+	    		xSec = event.getX(1);
+	    		ySec = event.getY(1);
 	    		
 	    		// distance between
-	    		dist_curr = (float) Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-				dist_delta = dist_curr - dist_pre;
+	    		distCur = (float) Math.sqrt(Math.pow(xSec - xCur, 2) + Math.pow(ySec - yCur, 2));
+				distDelta = distCur - distPre;
 	    		
+				//float rate = ZOOM;
+				float rate = ZOOM * (Math.abs(distDelta) > 100 ? 2 : 1);
 		    	long now = android.os.SystemClock.uptimeMillis();
-		    	if (now - mLastGestureTime > 100/* && Math.abs(dist_delta) > 10*/) {
+		    	if (now - mLastGestureTime > TOUCH_INTERVAL && Math.abs(distDelta) > mTouchSlop) {
 		    		mLastGestureTime = 0;
 		    		
 		    		ScaleAnimation scale = null;
-	    			int mode = dist_delta > 0 ? GROW : (dist_curr == dist_pre ? 2 : SHRINK);
+	    			int mode = distDelta > 0 ? GROW : (distCur == distPre ? 2 : SHRINK);
 		    		switch (mode) {
 		    		case GROW: // grow
-		    			if (x_scale < MAX_SCALE) {
-		    				scale = new ScaleAnimation(x_scale, 
-		    						x_scale += ZOOM, 
-		    						y_scale, 
-		    						y_scale += ZOOM, 
+		    			if (xScale < MAX_SCALE) {
+		    				scale = new ScaleAnimation(xScale, 
+		    						xScale += rate, 
+		    						yScale, 
+		    						yScale += rate, 
 		    						ScaleAnimation.RELATIVE_TO_SELF, 
 		    						0.5f, 
 		    						ScaleAnimation.RELATIVE_TO_SELF, 
@@ -83,11 +86,11 @@ public class PinchImageView extends ImageView  {
 		    			}
 		    		break;
 		    		case SHRINK: // shrink
-		    			if (x_scale > MIN_SCALE) {
-		    				scale = new ScaleAnimation(x_scale, 
-		    						x_scale -= ZOOM, 
-		    						y_scale, 
-		    						y_scale -= ZOOM, 
+		    			if (xScale > MIN_SCALE) {
+		    				scale = new ScaleAnimation(xScale, 
+		    						xScale -= rate, 
+		    						yScale, 
+		    						yScale -= rate, 
 		    						ScaleAnimation.RELATIVE_TO_SELF, 
 		    						0.5f, 
 		    						ScaleAnimation.RELATIVE_TO_SELF, 
@@ -99,37 +102,33 @@ public class PinchImageView extends ImageView  {
 		    		if (scale != null) {
 			            scale.setDuration(DURATION);
 			            scale.setFillAfter(true);
-			            scale.setInterpolator(getContext(), interpolator);
+			            scale.setInterpolator(getContext(), _interpolator);
 			            startAnimation(scale);
 		    		}
 		    		
 		    		mLastGestureTime = now;
 	    		}
 		    	
-		    	x1_pre = x1;
-		    	y1_pre = y1;
-				dist_pre = dist_curr;
-	    	}
-	    	// drag
-	    	else {
-	    		/*
-	    		int dist_x = Math.round(x1_pre - x1),
-	    			dist_y = Math.round(y1_pre - y1);
-	    		layout(getLeft() - dist_x, getTop() - dist_y, getRight() - dist_x, getBottom() - dist_y);
-	    		
-	    		x1_pre = x1;
-	    		y1_pre = y2;
-	    		*/
+		    	xPre = xCur;
+		    	yPre = yCur;
+				distPre = distCur;
 	    	}
 	    break;
 	    case MotionEvent.ACTION_POINTER_1_DOWN:
 	    	// point 1 coords
-    		x1_pre = event.getX(0);
-    		y1_pre = event.getY(0);
+    		xCur = xPre = event.getX(0);
+    		yCur = yPre = event.getY(0);
     		mLastGestureTime = android.os.SystemClock.uptimeMillis();
 	    break;
 	    }
 	    return true;
+	}
+	
+	private void _init() {
+		mTouchSlop = ViewConfiguration.getTouchSlop();
+		mPaint = new Paint();
+        mPaint.setAntiAlias(true);
+        //mScroller = new Scroller(getContext());
 	}
 
 }

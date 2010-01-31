@@ -78,8 +78,8 @@ public class PinchWebView extends WebView {
 
         final float density = getContext().getResources().getDisplayMetrics().density;
         
-        mDefaultWidth = mWidth = Math.round(getContext().getResources().getDisplayMetrics().widthPixels * density);
-        mDefaultHeight = mHeight = Math.round(getContext().getResources().getDisplayMetrics().heightPixels * density);
+        mDefaultWidth = mWidth = Math.round(getContext().getResources().getDisplayMetrics().widthPixels);
+        mDefaultHeight = mHeight = Math.round(getContext().getResources().getDisplayMetrics().heightPixels);
         
         //Log.e("INIT VALUES", "Max X: " + MAX_X + ", Max Y: " + MAX_Y);
 
@@ -91,7 +91,7 @@ public class PinchWebView extends WebView {
         
         Log.e("INIT VALUES", "Default Scale: " + DEFAULT_SCALE + ", Default Zoom Factor: " + ZOOM_FACTOR);
         
-        mScale = getScale() / 100;
+        mScale = 1;
 	
         mTouchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
 	}
@@ -125,7 +125,7 @@ public class PinchWebView extends WebView {
 					dist_delta = dist_curr - dist_pre;
 		    		
 			    	long now = android.os.SystemClock.uptimeMillis();
-			    	if (now - mLastGestureTime > 100 && Math.abs(dist_delta) > mTouchSlop) {
+			    	if (now - mLastGestureTime > 100 && Math.abs(dist_delta) > 10) {
 			    		mLastGestureTime = 0;
 			    		
 			    		ScaleAnimation scale = null;
@@ -148,8 +148,8 @@ public class PinchWebView extends WebView {
 			    		if (mode != 2) {
 			    			mOldWidth = mWidth;
 			    			mOldHeight = mHeight;
-				            mWidth = Math.round(getWidth() * mScale);
-							mHeight = Math.round(getHeight() * mScale);
+				            mWidth = Math.round(mDefaultWidth * mScale);
+							mHeight = Math.round(mDefaultHeight * mScale);
 							
 							Log.e("NEW WIDTH", mWidth + "");
 							
@@ -157,15 +157,16 @@ public class PinchWebView extends WebView {
 							//getLayoutParams().height = mHeight;
 							
 							//measure(MeasureSpec.makeMeasureSpec(mWidth, MeasureSpec.UNSPECIFIED), 
-							//		MeasureSpec.makeMeasureSpec(mHeight, MeasureSpec.UNSPECIFIED));
-							//layout(getLeft(), getTop(), mWidth + getLeft(), mHeight + getTop());
+								//	MeasureSpec.makeMeasureSpec(mHeight, MeasureSpec.UNSPECIFIED));
+							//layout(getLeft() + getScrollX(), getTop() + getScrollY(), mWidth + getLeft(), mHeight + getTop());
 							
-							//requestLayout();
+							//this.offsetTopAndBottom(mHeight - mOldHeight);
+							
 							//requestLayout();
 							//stopLoading();
-							mPicture = capturePicture();
+							//mPicture = capturePicture();
 							invalidate();
-							
+							/*
 			    			AnimationSet set = new AnimationSet(true);
 			    			
 			    			scale = new ScaleAnimation(
@@ -189,6 +190,7 @@ public class PinchWebView extends WebView {
 				            });
 				            
 				            set.addAnimation(scale);
+				            */
 				            /*
 				            TranslateAnimation translate = new TranslateAnimation(
 				            		Animation.RELATIVE_TO_SELF, mOldWidth - mWidth, Animation.RELATIVE_TO_SELF, 0f,
@@ -276,13 +278,13 @@ public class PinchWebView extends WebView {
 		canvas.setDrawFilter(sZoomFilter);
 		canvas.scale(mScale, mScale);
 		canvas.translate(-getScrollX(), -getScrollY());
-		
-		if (mPicture != null) {
-			canvas.save();
-			canvas.drawPicture(mPicture);
-			canvas.restore();
-			mPicture = null;
-		}
+		canvas.setViewport(mWidth, mHeight);
+		//if (mPicture != null) {
+		//	canvas.save();
+		//	canvas.drawPicture(mPicture);
+		//	canvas.restore();
+		//	mPicture = null;
+		//}
 		
 		super.onDraw(canvas);
 		
