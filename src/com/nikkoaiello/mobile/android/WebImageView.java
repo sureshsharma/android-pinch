@@ -4,17 +4,26 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.util.AttributeSet;
 import android.widget.ImageView;
 
 public class WebImageView extends ImageView {
-
+	
+	/**
+	 * Caches web images. This solution is only appropriate for a minimal amount of images.
+	 * For larger images, the files should be cached locally.
+	 */
+	static Map<String,Drawable> imageCache = new HashMap<String,Drawable>();
+	
 	Handler mHandler = null;
+	ImageListener listener = null;
+	boolean cache = false;
 	
 	public WebImageView(Context context, AttributeSet attrs, int defStyle) {
 		super(context, attrs, defStyle);
@@ -31,12 +40,23 @@ public class WebImageView extends ImageView {
 		_init();
 	}
 	
+	public void setCache(boolean cache) {
+		this.cache = cache;
+	}
+	
+	public void setImageListener(ImageListener listener) {
+		this.listener = listener;
+	}
+	
 	public void setImageFromURL(String imageUrl) {
-		Bitmap bmp = getDrawingCache();
-		if (bmp != null) {
-			// use our cached bitmap
-			setImageBitmap(bmp);
-			return;
+		
+		if (cache) {
+			Drawable d = imageCache.get(imageUrl);
+			if (d != null) {
+				// use our cached bitmap
+				setImageDrawable(d);
+				return;
+			}
 		}
 		
 		try {
@@ -52,11 +72,19 @@ public class WebImageView extends ImageView {
 					catch (IOException e) {}
 					
 					final InputStream imgStream = is;
+					final Drawable d = Drawable.createFromStream(imgStream, "src");
 					WebImageView.this.mHandler.post(new Runnable() {
 						public void run() {
+							// cache the image
+							if (WebImageView.this.cache) {
+								WebImageView.imageCache.put(url.toExternalForm(), d);
+							}
 							// set the image within the UI thread
-							setImageDrawable(Drawable.createFromStream(imgStream, "src"));
-							setDrawingCacheEnabled(true);
+							WebImageView.this.setImageDrawable(d);
+							// call our listener
+							if (WebImageView.this.listener != null) {
+								WebImageView.this.listener.onImageLoaded(WebImageView.this);
+							}
 						}
 					});
 				}
@@ -67,7 +95,10 @@ public class WebImageView extends ImageView {
 	
 	private void _init() {
 		mHandler = new Handler();
-		// set an image as a place holder for the view
-		//setImageResource();
+	}
+	
+	// ---------- Image Load Listener ---------- //
+	public static interface ImageListener {
+		public void onImageLoaded(WebImageView im);
 	}
 }
