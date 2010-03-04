@@ -4,12 +4,16 @@ import android.content.Context;
 import android.graphics.Paint;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
+import android.view.View;
 import android.view.ViewConfiguration;
+import android.view.View.OnTouchListener;
+import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
+import android.view.animation.TranslateAnimation;
 import android.widget.ImageView;
 import android.widget.Scroller;
 
-public class PinchImageView extends ImageView  {
+public class PinchImageView extends ImageView implements OnTouchListener  {
 	
 	public static final int GROW = 0;
 	public static final int SHRINK = 1;
@@ -23,6 +27,8 @@ public class PinchImageView extends ImageView  {
 	
 	private static int _interpolator = android.R.anim.accelerate_interpolator;
 	
+	ImageView im = null;
+	
 	float xCur, yCur, 
 		xPre, yPre,
 		xSec, ySec,
@@ -32,7 +38,7 @@ public class PinchImageView extends ImageView  {
 	int mTouchSlop;
 	long mLastGestureTime;
 	Paint mPaint;
-	//Scroller mScroller;
+	Scroller mScroller;
 	
 	public PinchImageView(Context context,AttributeSet attr) {
          super(context,attr);
@@ -42,8 +48,15 @@ public class PinchImageView extends ImageView  {
 	public PinchImageView(Context context) {
         super(context);        
         _init();
-   }
-
+    }
+	
+	public PinchImageView(ImageView im) {
+		super(im.getContext());
+		_init();
+		this.im = im;
+		this.im.setOnTouchListener(this);
+	}
+	
 	public boolean onTouchEvent(MotionEvent event) {
 		int action = event.getAction() & MotionEvent.ACTION_MASK, 
 			p_count = event.getPointerCount();
@@ -103,16 +116,36 @@ public class PinchImageView extends ImageView  {
 			            scale.setDuration(DURATION);
 			            scale.setFillAfter(true);
 			            scale.setInterpolator(getContext(), _interpolator);
-			            startAnimation(scale);
+			            
+			            im.startAnimation(scale);
 		    		}
 		    		
 		    		mLastGestureTime = now;
 	    		}
-		    	
-		    	xPre = xCur;
-		    	yPre = yCur;
-				distPre = distCur;
 	    	}
+	    	else {
+	    		// translate
+	    		float xDelta = xPre - xCur,
+	    			yDelta = yPre - yCur;
+	    		im.scrollBy((int)(xDelta - xCur), (int)(yDelta - yCur));
+	    		//mScroller.startScroll((int)xPre, (int)yPre, (int)xDelta, (int)yDelta);
+	    		/*
+	    		TranslateAnimation scroll = new TranslateAnimation(Animation.RELATIVE_TO_PARENT, 0, 
+	    				Animation.RELATIVE_TO_PARENT, -xDelta, 
+	    				Animation.RELATIVE_TO_PARENT, 0, 
+	    				Animation.RELATIVE_TO_PARENT, -yDelta);
+	    		scroll.setDuration(50);
+	    		scroll.setFillAfter(true);
+	            scroll.setInterpolator(getContext(), _interpolator);
+	    		*/
+	            //im.startAnimation(scroll);
+	            
+	    		//im.layout(im.getLeft() - (int)xDelta, im.getTop() - (int)yDelta, im.getRight() - (int)xDelta, im.getBottom() - (int)yDelta);
+	    	}
+	    	
+	    	xPre = xCur;
+	    	yPre = yCur;
+			distPre = distCur;
 	    break;
 	    case MotionEvent.ACTION_POINTER_1_DOWN:
 	    	// point 1 coords
@@ -125,10 +158,16 @@ public class PinchImageView extends ImageView  {
 	}
 	
 	private void _init() {
+		im = this;
 		mTouchSlop = ViewConfiguration.getTouchSlop();
 		mPaint = new Paint();
         mPaint.setAntiAlias(true);
-        //mScroller = new Scroller(getContext());
+        mScroller = new Scroller(getContext());
+	}
+
+	@Override
+	public boolean onTouch(View v, MotionEvent event) {
+		return this.onTouchEvent(event);
 	}
 
 }

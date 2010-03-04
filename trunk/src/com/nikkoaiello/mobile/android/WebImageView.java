@@ -2,13 +2,14 @@ package com.nikkoaiello.mobile.android;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.ref.SoftReference;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import android.content.Context;
-import android.graphics.drawable.Drawable;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Handler;
 import android.util.AttributeSet;
 import android.widget.ImageView;
@@ -19,11 +20,20 @@ public class WebImageView extends ImageView {
 	 * Caches web images. This solution is only appropriate for a minimal amount of images.
 	 * For larger images, the files should be cached locally.
 	 */
-	static Map<String,Drawable> imageCache = new HashMap<String,Drawable>();
+	final static ConcurrentHashMap<String,SoftReference<Bitmap>> imageCache = new ConcurrentHashMap<String,SoftReference<Bitmap>>();
 	
-	Handler mHandler = null;
+	final static ImageListener defaultListener = new ImageListener() {
+		public void onImageLoaded(WebImageView im, Bitmap bm, String url) {
+			im.setImageBitmap(bm);
+		}
+	};
+	
 	ImageListener listener = null;
 	boolean cache = false;
+	
+	public static ConcurrentHashMap<String,SoftReference<Bitmap>> getImageCache() {
+		return imageCache;
+	}
 	
 	public WebImageView(Context context, AttributeSet attrs, int defStyle) {
 		super(context, attrs, defStyle);
@@ -50,13 +60,14 @@ public class WebImageView extends ImageView {
 	
 	public void setImageFromURL(String imageUrl) {
 		
-		if (cache) {
-			Drawable d = imageCache.get(imageUrl);
-			if (d != null) {
+		if (cache && imageCache.contains(imageUrl)) {
+			SoftReference<Bitmap> ref = imageCache.get(imageUrl);
+			if (ref != null) {
 				// use our cached bitmap
-				setImageDrawable(d);
+				setImageBitmap(ref.get());
 				return;
 			}
+			imageCache.remove(imageUrl);
 		}
 		
 		try {
@@ -72,21 +83,24 @@ public class WebImageView extends ImageView {
 					catch (IOException e) {}
 					
 					final InputStream imgStream = is;
-					final Drawable d = Drawable.createFromStream(imgStream, "src");
-					WebImageView.this.mHandler.post(new Runnable() {
-						public void run() {
-							// cache the image
-							if (WebImageView.this.cache) {
-								WebImageView.imageCache.put(url.toExternalForm(), d);
+					final Bitmap bm = BitmapFactory.decodeStream(imgStream);
+					if (WebImageView.this.getHandler() != null) {
+						WebImageView.this.post(new Runnable() {
+							public void run() {
+								// cache the image
+								if (WebImageView.this.cache) {
+									WebImageView.imageCache.put(url.toExternalForm(), new SoftReference<Bitmap>(bm));
+								}
+								// call our listener
+								if (WebImageView.this.listener != null) {
+									WebImageView.this.listener.onImageLoaded(WebImageView.this, bm, url.toExternalForm());
+								}
+								else {
+									WebImageView.defaultListener.onImageLoaded(WebImageView.this, bm, url.toExternalForm());
+								}
 							}
-							// set the image within the UI thread
-							WebImageView.this.setImageDrawable(d);
-							// call our listener
-							if (WebImageView.this.listener != null) {
-								WebImageView.this.listener.onImageLoaded(WebImageView.this);
-							}
-						}
-					});
+						});
+					}
 				}
 			}.start();
 		} 
@@ -94,11 +108,11 @@ public class WebImageView extends ImageView {
 	}
 	
 	private void _init() {
-		mHandler = new Handler();
+		
 	}
 	
 	// ---------- Image Load Listener ---------- //
 	public static interface ImageListener {
-		public void onImageLoaded(WebImageView im);
+		public void onImageLoaded(WebImageView im, Bitmap bm, String url);
 	}
 }
