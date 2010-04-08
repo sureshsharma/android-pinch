@@ -13,7 +13,7 @@ mGestureDetector = new GestureDetector(new GestureDetector.SimpleOnGestureListen
      // double tap zoom
      public boolean onDoubleTap(MotionEvent e) {
 	if (mPinchImageView.getScale() > 1f) {
-	    mPinchImageView.zoomTo(MIN_SCALE);
+	    mPinchImageView.zoomTo(1f);
 	}
 	else {
 	    // MAX_SCALE is a float constant defined in the Activity
